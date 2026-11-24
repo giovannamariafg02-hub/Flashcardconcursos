@@ -1,0 +1,1334 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>EstudaCards — Flashcards Inteligentes</title>
+    <!-- Tailwind CSS -->
+    <script src="https://cdn.tailwindcss.com"></script>
+    <!-- Google Fonts: Inter -->
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap" rel="stylesheet">
+    <!-- Lucide Icons -->
+    <script src="https://unpkg.com/lucide@latest"></script>
+
+    <script>
+        tailwind.config = {
+            darkMode: 'class',
+            theme: {
+                extend: {
+                    fontFamily: {
+                        sans: ['Inter', 'sans-serif'],
+                    },
+                    colors: {
+                        brand: {
+                            50: '#eef2ff',
+                            100: '#e0e7ff',
+                            500: '#6366f1',
+                            600: '#4f46e5',
+                            700: '#4338ca',
+                        }
+                    }
+                }
+            }
+        }
+    </script>
+
+    <style>
+        /* Estilos customizados essenciais para animação 3D Flip e barra de rolagem limpa */
+        .perspective-1000 {
+            perspective: 1000px;
+        }
+        .transform-style-3d {
+            transform-style: preserve-3d;
+        }
+        .backface-hidden {
+            backface-visibility: hidden;
+            -webkit-backface-visibility: hidden;
+        }
+        .rotate-y-180 {
+            transform: rotateY(180deg);
+        }
+        
+        /* Transição suave do cartão */
+        .flashcard-inner {
+            transition: transform 0.55s cubic-bezier(0.23, 1, 0.32, 1);
+        }
+
+        /* Scrollbar minimalista */
+        ::-webkit-scrollbar {
+            width: 6px;
+            height: 6px;
+        }
+        ::-webkit-scrollbar-track {
+            background: transparent;
+        }
+        ::-webkit-scrollbar-thumb {
+            background: rgba(156, 163, 175, 0.4);
+            border-radius: 9999px;
+        }
+        ::-webkit-scrollbar-thumb:hover {
+            background: rgba(156, 163, 175, 0.7);
+        }
+    </style>
+</head>
+<body class="bg-slate-50 text-slate-800 dark:bg-slate-950 dark:text-slate-100 font-sans antialiased selection:bg-brand-500 selection:text-white transition-colors duration-200 min-h-screen flex flex-col">
+
+    <!-- ==================== HEADER / NAVBAR ==================== -->
+    <header class="sticky top-0 z-30 bg-white/80 dark:bg-slate-900/80 backdrop-blur-md border-b border-slate-200 dark:border-slate-800">
+        <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 h-16 flex items-center justify-between gap-4">
+            <!-- Logo e Menu Mobile -->
+            <div class="flex items-center gap-3">
+                <button id="mobile-menu-btn" class="lg:hidden p-2 rounded-xl text-slate-600 dark:text-slate-300 hover:bg-slate-100 dark:hover:bg-slate-800 transition-colors" aria-label="Abrir menu de baralhos">
+                    <i data-lucide="menu" class="w-5 h-5"></i>
+                </button>
+                <div class="flex items-center gap-2.5 cursor-pointer" onclick="app.switchView('manage')">
+                    <div class="w-9 h-9 rounded-xl bg-brand-600 flex items-center justify-center text-white shadow-sm shadow-brand-500/20">
+                        <i data-lucide="layers" class="w-5 h-5"></i>
+                    </div>
+                    <div>
+                        <span class="font-bold text-lg tracking-tight text-slate-900 dark:text-white">Estuda<span class="text-brand-600 dark:text-brand-500">Cards</span></span>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Ações Globais (Backup e Tema) -->
+            <div class="flex items-center gap-2">
+                <button onclick="app.exportJSON()" title="Exportar Backup (JSON)" class="hidden sm:flex items-center gap-1.5 px-3 py-2 text-xs font-medium rounded-xl border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800 text-slate-700 dark:text-slate-200 hover:bg-slate-50 dark:hover:bg-slate-700/80 transition-colors">
+                    <i data-lucide="download" class="w-4 h-4 text-slate-500 dark:text-slate-400"></i>
+                    <span>Exportar</span>
+                </button>
+                
+                <label title="Importar Backup (JSON)" class="hidden sm:flex items-center gap-1.5 px-3 py-2 text-xs font-medium rounded-xl border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800 text-slate-700 dark:text-slate-200 hover:bg-slate-50 dark:hover:bg-slate-700/80 transition-colors cursor-pointer">
+                    <i data-lucide="upload" class="w-4 h-4 text-slate-500 dark:text-slate-400"></i>
+                    <span>Importar</span>
+                    <input type="file" id="import-json-input" accept=".json" class="hidden" onchange="app.importJSON(event)">
+                </label>
+
+                <button id="theme-toggle" onclick="app.toggleTheme()" title="Alternar Tema Claro/Escuro" class="p-2.5 rounded-xl border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800 text-slate-600 dark:text-slate-300 hover:bg-slate-100 dark:hover:bg-slate-700 transition-colors">
+                    <i data-lucide="moon" class="w-4 h-4 hidden dark:block"></i>
+                    <i data-lucide="sun" class="w-4 h-4 block dark:hidden"></i>
+                </button>
+            </div>
+        </div>
+    </header>
+
+    <!-- ==================== CONTAINER PRINCIPAL ==================== -->
+    <div class="flex-1 max-w-7xl w-full mx-auto flex relative">
+
+        <!-- Overlay Mobile Sidebar -->
+        <div id="sidebar-overlay" onclick="app.closeMobileSidebar()" class="fixed inset-0 bg-slate-900/50 backdrop-blur-xs z-40 hidden lg:hidden transition-opacity"></div>
+
+        <!-- ==================== SIDEBAR: BARALHOS ==================== -->
+        <aside id="sidebar" class="fixed lg:static inset-y-0 left-0 z-50 w-72 bg-white dark:bg-slate-900 lg:bg-transparent lg:dark:bg-transparent border-r border-slate-200 dark:border-slate-800 flex flex-col transform -translate-x-full lg:translate-x-0 transition-transform duration-200 ease-in-out">
+            <div class="p-4 lg:pt-6 flex flex-col h-full">
+                <div class="flex items-center justify-between mb-4">
+                    <h2 class="text-xs font-semibold uppercase tracking-wider text-slate-400 dark:text-slate-500">Seus Baralhos</h2>
+                    <button onclick="app.openDeckModal()" class="inline-flex items-center gap-1 text-xs font-semibold text-brand-600 dark:text-brand-400 hover:text-brand-700 dark:hover:text-brand-300 px-2.5 py-1.5 rounded-lg bg-brand-50 dark:bg-brand-500/10 transition-colors">
+                        <i data-lucide="plus" class="w-3.5 h-3.5"></i>
+                        Novo Baralho
+                    </button>
+                </div>
+
+                <!-- Lista de Baralhos -->
+                <div id="deck-list" class="flex-1 overflow-y-auto space-y-1.5 pr-1">
+                    <!-- Renderizado via JS -->
+                </div>
+
+                <!-- Backup Mobile -->
+                <div class="sm:hidden pt-4 mt-4 border-t border-slate-200 dark:border-slate-800 flex gap-2">
+                    <button onclick="app.exportJSON()" class="flex-1 flex items-center justify-center gap-1.5 py-2 text-xs font-medium rounded-xl border border-slate-200 dark:border-slate-700 bg-slate-50 dark:bg-slate-800">
+                        <i data-lucide="download" class="w-3.5 h-3.5"></i> Exportar
+                    </button>
+                    <label class="flex-1 flex items-center justify-center gap-1.5 py-2 text-xs font-medium rounded-xl border border-slate-200 dark:border-slate-700 bg-slate-50 dark:bg-slate-800 cursor-pointer">
+                        <i data-lucide="upload" class="w-3.5 h-3.5"></i> Importar
+                        <input type="file" accept=".json" class="hidden" onchange="app.importJSON(event)">
+                    </label>
+                </div>
+            </div>
+        </aside>
+
+        <!-- ==================== ÁREA DE CONTEÚDO ==================== -->
+        <main class="flex-1 p-4 sm:p-6 lg:p-8 overflow-y-auto w-full">
+            
+            <!-- Estado Vazio (Sem nenhum baralho) -->
+            <div id="empty-decks-state" class="hidden flex flex-col items-center justify-center text-center py-20 px-4">
+                <div class="w-16 h-16 rounded-2xl bg-slate-100 dark:bg-slate-800 flex items-center justify-center text-slate-400 mb-4">
+                    <i data-lucide="folder-plus" class="w-8 h-8"></i>
+                </div>
+                <h3 class="text-lg font-semibold text-slate-900 dark:text-white mb-1">Nenhum baralho encontrado</h3>
+                <p class="text-sm text-slate-500 dark:text-slate-400 max-w-md mb-6">Crie seu primeiro baralho de estudos para começar a organizar suas matérias e memorizar conteúdos com eficiência.</p>
+                <button onclick="app.openDeckModal()" class="inline-flex items-center gap-2 px-5 py-2.5 rounded-xl bg-brand-600 hover:bg-brand-700 text-white font-medium text-sm shadow-sm transition-colors">
+                    <i data-lucide="plus" class="w-4 h-4"></i>
+                    Criar Primeiro Baralho
+                </button>
+            </div>
+
+            <!-- Conteúdo do Baralho Ativo -->
+            <div id="active-deck-container" class="max-w-4xl mx-auto space-y-6">
+                
+                <!-- Cabeçalho do Baralho Selecionado -->
+                <div class="bg-white dark:bg-slate-900 rounded-2xl p-5 sm:p-6 border border-slate-200 dark:border-slate-800 shadow-xs flex flex-col sm:flex-row sm:items-center justify-between gap-4">
+                    <div class="space-y-1">
+                        <div class="flex items-center gap-2">
+                            <span id="deck-category-badge" class="text-xs font-medium px-2.5 py-0.5 rounded-full bg-brand-50 text-brand-700 dark:bg-brand-500/15 dark:text-brand-300">Matéria</span>
+                            <span id="deck-stats-summary" class="text-xs text-slate-500 dark:text-slate-400">0 cards</span>
+                        </div>
+                        <div class="flex items-center gap-2">
+                            <h1 id="active-deck-title" class="text-xl sm:text-2xl font-bold text-slate-900 dark:text-white tracking-tight">Título do Baralho</h1>
+                            <button onclick="app.openDeckModal(true)" title="Renomear Baralho" class="p-1.5 rounded-lg text-slate-400 hover:text-slate-600 dark:hover:text-slate-200 hover:bg-slate-100 dark:hover:bg-slate-800 transition-colors">
+                                <i data-lucide="pencil" class="w-4 h-4"></i>
+                            </button>
+                            <button onclick="app.confirmDeleteDeck()" title="Excluir Baralho" class="p-1.5 rounded-lg text-slate-400 hover:text-rose-600 dark:hover:text-rose-400 hover:bg-rose-50 dark:hover:bg-rose-500/10 transition-colors">
+                                <i data-lucide="trash-2" class="w-4 h-4"></i>
+                            </button>
+                        </div>
+                    </div>
+
+                    <!-- Botões de Alternância: Estudar vs Gerenciar -->
+                    <div class="flex items-center gap-2 self-start sm:self-center">
+                        <button id="btn-mode-manage" onclick="app.switchView('manage')" class="px-4 py-2.5 rounded-xl text-sm font-medium transition-all flex items-center gap-2">
+                            <i data-lucide="list" class="w-4 h-4"></i>
+                            <span>Gerenciar Cards</span>
+                        </button>
+                        <button id="btn-mode-study" onclick="app.switchView('study')" class="px-4 py-2.5 rounded-xl text-sm font-medium transition-all flex items-center gap-2">
+                            <i data-lucide="play" class="w-4 h-4"></i>
+                            <span>Estudar Agora</span>
+                        </button>
+                    </div>
+                </div>
+
+                <!-- ==================== VISÃO 1: GERENCIAR CARDS ==================== -->
+                <div id="view-manage" class="space-y-6">
+                    
+                    <!-- Barra de Ações de Cards -->
+                    <div class="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
+                        <div class="relative flex-1 max-w-md">
+                            <i data-lucide="search" class="w-4 h-4 text-slate-400 absolute left-3.5 top-1/2 -translate-y-1/2"></i>
+                            <input type="text" id="search-cards-input" oninput="app.renderCardsList()" placeholder="Buscar pergunta ou resposta..." class="w-full pl-10 pr-4 py-2.5 text-sm rounded-xl border border-slate-200 dark:border-slate-800 bg-white dark:bg-slate-900 text-slate-800 dark:text-slate-100 focus:outline-none focus:ring-2 focus:ring-brand-500/40 focus:border-brand-500 transition-all">
+                        </div>
+
+                        <div class="flex items-center gap-2">
+                            <button onclick="app.openBatchModal()" class="flex-1 sm:flex-none inline-flex items-center justify-center gap-2 px-4 py-2.5 rounded-xl text-sm font-medium border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-900 text-slate-700 dark:text-slate-200 hover:bg-slate-50 dark:hover:bg-slate-800 transition-colors">
+                                <i data-lucide="file-spreadsheet" class="w-4 h-4 text-slate-500"></i>
+                                <span>Importar em Lote</span>
+                            </button>
+                            <button onclick="app.openCardModal()" class="flex-1 sm:flex-none inline-flex items-center justify-center gap-2 px-4 py-2.5 rounded-xl text-sm font-medium bg-brand-600 hover:bg-brand-700 text-white shadow-xs transition-colors">
+                                <i data-lucide="plus" class="w-4 h-4"></i>
+                                <span>Novo Card</span>
+                            </button>
+                        </div>
+                    </div>
+
+                    <!-- Lista de Cards do Baralho -->
+                    <div id="cards-list-container" class="grid grid-cols-1 gap-3">
+                        <!-- Renderizado via JS -->
+                    </div>
+                </div>
+
+                <!-- ==================== VISÃO 2: MODO DE ESTUDO ==================== -->
+                <div id="view-study" class="hidden space-y-6">
+                    
+                    <!-- Controles da Sessão de Estudo -->
+                    <div class="bg-white dark:bg-slate-900 rounded-2xl p-4 border border-slate-200 dark:border-slate-800 flex flex-wrap items-center justify-between gap-4">
+                        <div class="flex items-center gap-3">
+                            <label class="inline-flex items-center gap-2 cursor-pointer select-none text-sm text-slate-700 dark:text-slate-300">
+                                <input type="checkbox" id="filter-review-only" onchange="app.initStudySession()" class="w-4 h-4 rounded text-brand-600 focus:ring-brand-500 border-slate-300 dark:border-slate-700 dark:bg-slate-800">
+                                <span>Apenas difíceis / revisar</span>
+                            </label>
+                        </div>
+
+                        <div class="flex items-center gap-2">
+                            <button onclick="app.shuffleStudyQueue()" class="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-xl text-xs font-medium border border-slate-200 dark:border-slate-700 hover:bg-slate-50 dark:hover:bg-slate-800 text-slate-700 dark:text-slate-200 transition-colors">
+                                <i data-lucide="shuffle" class="w-3.5 h-3.5"></i>
+                                <span>Embaralhar</span>
+                            </button>
+                            <button onclick="app.initStudySession()" class="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-xl text-xs font-medium border border-slate-200 dark:border-slate-700 hover:bg-slate-50 dark:hover:bg-slate-800 text-slate-700 dark:text-slate-200 transition-colors">
+                                <i data-lucide="rotate-ccw" class="w-3.5 h-3.5"></i>
+                                <span>Reiniciar</span>
+                            </button>
+                        </div>
+                    </div>
+
+                    <!-- Barra de Progresso -->
+                    <div id="study-progress-wrapper" class="space-y-2">
+                        <div class="flex justify-between text-xs font-medium text-slate-500 dark:text-slate-400">
+                            <span id="study-progress-text">Card 1 de 10</span>
+                            <span id="study-remaining-text">Restantes na fila: 10</span>
+                        </div>
+                        <div class="w-full h-2 bg-slate-200 dark:bg-slate-800 rounded-full overflow-hidden">
+                            <div id="study-progress-bar" class="h-full bg-brand-600 transition-all duration-300 rounded-full" style="width: 0%"></div>
+                        </div>
+                    </div>
+
+                    <!-- Palco do Flashcard 3D -->
+                    <div id="study-stage" class="py-2">
+                        <div class="perspective-1000 w-full max-w-2xl mx-auto">
+                            <div id="flashcard-3d" onclick="app.flipCard()" class="flashcard-inner relative w-full min-h-[320px] sm:min-h-[360px] cursor-pointer transform-style-3d">
+                                
+                                <!-- FRENTE DO CARTÃO -->
+                                <div class="backface-hidden absolute inset-0 w-full h-full bg-white dark:bg-slate-900 rounded-3xl border border-slate-200 dark:border-slate-800 shadow-sm p-6 sm:p-10 flex flex-col justify-between">
+                                    <div class="flex items-center justify-between">
+                                        <span class="text-xs font-semibold uppercase tracking-wider text-brand-600 dark:text-brand-400 bg-brand-50 dark:bg-brand-500/10 px-3 py-1 rounded-full">Frente • Pergunta</span>
+                                        <span id="card-status-pill" class="text-xs font-medium px-2.5 py-0.5 rounded-full bg-slate-100 dark:bg-slate-800 text-slate-500">Novo</span>
+                                    </div>
+                                    
+                                    <div class="my-auto py-6 text-center overflow-y-auto max-h-[220px]">
+                                        <p id="card-front-text" class="text-xl sm:text-2xl font-semibold text-slate-900 dark:text-white leading-relaxed whitespace-pre-line">Pergunta aqui</p>
+                                    </div>
+
+                                    <div class="text-center text-xs text-slate-400 dark:text-slate-500 flex items-center justify-center gap-1.5">
+                                        <i data-lucide="pointer" class="w-3.5 h-3.5"></i>
+                                        <span>Clique no cartão ou pressione <kbd class="px-1.5 py-0.5 rounded bg-slate-100 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 font-mono text-[11px]">Espaço</kbd> para virar</span>
+                                    </div>
+                                </div>
+
+                                <!-- VERSO DO CARTÃO -->
+                                <div class="backface-hidden rotate-y-180 absolute inset-0 w-full h-full bg-slate-50 dark:bg-slate-800/90 rounded-3xl border-2 border-brand-500/30 dark:border-brand-500/40 shadow-md p-6 sm:p-10 flex flex-col justify-between">
+                                    <div class="flex items-center justify-between">
+                                        <span class="text-xs font-semibold uppercase tracking-wider text-emerald-600 dark:text-emerald-400 bg-emerald-50 dark:bg-emerald-500/10 px-3 py-1 rounded-full">Verso • Resposta</span>
+                                        <span class="text-xs text-slate-400">Avalie seu desempenho abaixo</span>
+                                    </div>
+                                    
+                                    <div class="my-auto py-6 text-center overflow-y-auto max-h-[220px]">
+                                        <p id="card-back-text" class="text-lg sm:text-xl font-medium text-slate-800 dark:text-slate-100 leading-relaxed whitespace-pre-line">Resposta aqui</p>
+                                    </div>
+
+                                    <div class="text-center text-xs text-slate-400 dark:text-slate-500">
+                                        <span>Clique novamente para rever a pergunta</span>
+                                    </div>
+                                </div>
+
+                            </div>
+                        </div>
+
+                        <!-- Botão Virar (antes de revelar) -->
+                        <div id="flip-action-area" class="max-w-2xl mx-auto mt-6 flex justify-center">
+                            <button onclick="app.flipCard()" class="w-full sm:w-auto px-8 py-3.5 rounded-2xl bg-slate-900 dark:bg-white text-white dark:text-slate-900 font-semibold text-sm hover:opacity-90 transition-opacity shadow-sm">
+                                Mostrar Resposta (Espaço)
+                            </button>
+                        </div>
+
+                        <!-- Botões de Autoavaliação (após virar) -->
+                        <div id="rating-actions-area" class="hidden max-w-2xl mx-auto mt-6 space-y-2">
+                            <p class="text-center text-xs font-medium text-slate-500 dark:text-slate-400 mb-2">Como você se saiu neste card?</p>
+                            <div class="grid grid-cols-2 sm:grid-cols-4 gap-2.5">
+                                <button onclick="app.rateCard('again')" class="flex flex-col items-center justify-center p-3 rounded-2xl border border-rose-200 dark:border-rose-900/60 bg-rose-50/70 dark:bg-rose-950/40 hover:bg-rose-100 dark:hover:bg-rose-900/50 text-rose-700 dark:text-rose-300 transition-colors">
+                                    <span class="font-semibold text-sm">Errei / Revisar</span>
+                                    <span class="text-[11px] opacity-75 mt-0.5">Repetir na sessão • [1]</span>
+                                </button>
+                                <button onclick="app.rateCard('hard')" class="flex flex-col items-center justify-center p-3 rounded-2xl border border-amber-200 dark:border-amber-900/60 bg-amber-50/70 dark:bg-amber-950/40 hover:bg-amber-100 dark:hover:bg-amber-900/50 text-amber-700 dark:text-amber-300 transition-colors">
+                                    <span class="font-semibold text-sm">Difícil</span>
+                                    <span class="text-[11px] opacity-75 mt-0.5">Revisar em breve • [2]</span>
+                                </button>
+                                <button onclick="app.rateCard('good')" class="flex flex-col items-center justify-center p-3 rounded-2xl border border-brand-200 dark:border-brand-900/60 bg-brand-50/70 dark:bg-brand-950/40 hover:bg-brand-100 dark:hover:bg-brand-900/50 text-brand-700 dark:text-brand-300 transition-colors">
+                                    <span class="font-semibold text-sm">Bom</span>
+                                    <span class="text-[11px] opacity-75 mt-0.5">Aprendido • [3]</span>
+                                </button>
+                                <button onclick="app.rateCard('easy')" class="flex flex-col items-center justify-center p-3 rounded-2xl border border-emerald-200 dark:border-emerald-900/60 bg-emerald-50/70 dark:bg-emerald-950/40 hover:bg-emerald-100 dark:hover:bg-emerald-900/50 text-emerald-700 dark:text-emerald-300 transition-colors">
+                                    <span class="font-semibold text-sm">Fácil</span>
+                                    <span class="text-[11px] opacity-75 mt-0.5">Dominado • [4]</span>
+                                </button>
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- Tela de Conclusão / Fila Vazia -->
+                    <div id="study-completed-screen" class="hidden bg-white dark:bg-slate-900 rounded-3xl border border-slate-200 dark:border-slate-800 p-8 sm:p-12 text-center max-w-2xl mx-auto space-y-6">
+                        <div class="w-16 h-16 rounded-2xl bg-emerald-50 dark:bg-emerald-500/10 text-emerald-600 dark:text-emerald-400 flex items-center justify-center mx-auto">
+                            <i data-lucide="award" class="w-8 h-8"></i>
+                        </div>
+                        <div class="space-y-2">
+                            <h2 id="completed-title" class="text-2xl font-bold text-slate-900 dark:text-white">Sessão Concluída!</h2>
+                            <p id="completed-subtitle" class="text-sm text-slate-500 dark:text-slate-400">Você revisou todos os flashcards programados para esta sessão.</p>
+                        </div>
+
+                        <!-- Estatísticas da Sessão -->
+                        <div id="session-stats-grid" class="grid grid-cols-2 sm:grid-cols-4 gap-3 pt-2">
+                            <div class="p-3 rounded-2xl bg-rose-50/60 dark:bg-rose-950/30 border border-rose-100 dark:border-rose-900/40">
+                                <div id="stat-again" class="text-xl font-bold text-rose-600 dark:text-rose-400">0</div>
+                                <div class="text-xs text-slate-600 dark:text-slate-400">Errei</div>
+                            </div>
+                            <div class="p-3 rounded-2xl bg-amber-50/60 dark:bg-amber-950/30 border border-amber-100 dark:border-amber-900/40">
+                                <div id="stat-hard" class="text-xl font-bold text-amber-600 dark:text-amber-400">0</div>
+                                <div class="text-xs text-slate-600 dark:text-slate-400">Difícil</div>
+                            </div>
+                            <div class="p-3 rounded-2xl bg-brand-50/60 dark:bg-brand-950/30 border border-brand-100 dark:border-brand-900/40">
+                                <div id="stat-good" class="text-xl font-bold text-brand-600 dark:text-brand-400">0</div>
+                                <div class="text-xs text-slate-600 dark:text-slate-400">Bom</div>
+                            </div>
+                            <div class="p-3 rounded-2xl bg-emerald-50/60 dark:bg-emerald-950/30 border border-emerald-100 dark:border-emerald-900/40">
+                                <div id="stat-easy" class="text-xl font-bold text-emerald-600 dark:text-emerald-400">0</div>
+                                <div class="text-xs text-slate-600 dark:text-slate-400">Fácil</div>
+                            </div>
+                        </div>
+
+                        <div class="flex flex-wrap items-center justify-center gap-3 pt-2">
+                            <button onclick="app.initStudySession()" class="px-5 py-2.5 rounded-xl bg-brand-600 hover:bg-brand-700 text-white text-sm font-medium transition-colors">
+                                Estudar Novamente
+                            </button>
+                            <button onclick="app.switchView('manage')" class="px-5 py-2.5 rounded-xl border border-slate-200 dark:border-slate-700 hover:bg-slate-50 dark:hover:bg-slate-800 text-sm font-medium transition-colors">
+                                Voltar aos Cards
+                            </button>
+                        </div>
+                    </div>
+
+                </div>
+            </div>
+        </main>
+    </div>
+
+    <!-- ==================== MODAIS ==================== -->
+
+    <!-- Modal: Criar / Editar Baralho -->
+    <div id="deck-modal" class="fixed inset-0 z-50 hidden items-center justify-center p-4 bg-slate-900/60 backdrop-blur-xs">
+        <div class="bg-white dark:bg-slate-900 rounded-2xl border border-slate-200 dark:border-slate-800 w-full max-w-md p-6 shadow-xl space-y-5">
+            <div class="flex items-center justify-between">
+                <h3 id="deck-modal-title" class="text-lg font-bold text-slate-900 dark:text-white">Novo Baralho</h3>
+                <button onclick="app.closeModal('deck-modal')" class="p-1.5 rounded-lg text-slate-400 hover:bg-slate-100 dark:hover:bg-slate-800">
+                    <i data-lucide="x" class="w-5 h-5"></i>
+                </button>
+            </div>
+            <form id="deck-form" onsubmit="app.saveDeck(event)" class="space-y-4">
+                <div>
+                    <label class="block text-xs font-semibold uppercase tracking-wider text-slate-500 dark:text-slate-400 mb-1.5">Nome do Baralho</label>
+                    <input type="text" id="deck-name-input" required placeholder="Ex: Direito Constitucional" class="w-full px-3.5 py-2.5 text-sm rounded-xl border border-slate-200 dark:border-slate-700 bg-slate-50 dark:bg-slate-800 text-slate-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-brand-500">
+                </div>
+                <div>
+                    <label class="block text-xs font-semibold uppercase tracking-wider text-slate-500 dark:text-slate-400 mb-1.5">Matéria / Categoria</label>
+                    <input type="text" id="deck-category-input" placeholder="Ex: Direito, Idiomas, Biologia..." class="w-full px-3.5 py-2.5 text-sm rounded-xl border border-slate-200 dark:border-slate-700 bg-slate-50 dark:bg-slate-800 text-slate-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-brand-500">
+                </div>
+                <div class="flex justify-end gap-2 pt-2">
+                    <button type="button" onclick="app.closeModal('deck-modal')" class="px-4 py-2 rounded-xl text-sm font-medium text-slate-600 dark:text-slate-300 hover:bg-slate-100 dark:hover:bg-slate-800">Cancelar</button>
+                    <button type="submit" class="px-5 py-2 rounded-xl text-sm font-medium bg-brand-600 hover:bg-brand-700 text-white">Salvar</button>
+                </div>
+            </form>
+        </div>
+    </div>
+
+    <!-- Modal: Criar / Editar Flashcard -->
+    <div id="card-modal" class="fixed inset-0 z-50 hidden items-center justify-center p-4 bg-slate-900/60 backdrop-blur-xs">
+        <div class="bg-white dark:bg-slate-900 rounded-2xl border border-slate-200 dark:border-slate-800 w-full max-w-lg p-6 shadow-xl space-y-5">
+            <div class="flex items-center justify-between">
+                <h3 id="card-modal-title" class="text-lg font-bold text-slate-900 dark:text-white">Novo Flashcard</h3>
+                <button onclick="app.closeModal('card-modal')" class="p-1.5 rounded-lg text-slate-400 hover:bg-slate-100 dark:hover:bg-slate-800">
+                    <i data-lucide="x" class="w-5 h-5"></i>
+                </button>
+            </div>
+            <form id="card-form" onsubmit="app.saveCard(event)" class="space-y-4">
+                <input type="hidden" id="card-edit-id">
+                <div>
+                    <label class="block text-xs font-semibold uppercase tracking-wider text-slate-500 dark:text-slate-400 mb-1.5">Frente (Pergunta ou Conceito)</label>
+                    <textarea id="card-front-input" rows="3" required placeholder="Digite a pergunta ou termo a ser memorizado..." class="w-full px-3.5 py-2.5 text-sm rounded-xl border border-slate-200 dark:border-slate-700 bg-slate-50 dark:bg-slate-800 text-slate-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-brand-500"></textarea>
+                </div>
+                <div>
+                    <label class="block text-xs font-semibold uppercase tracking-wider text-slate-500 dark:text-slate-400 mb-1.5">Verso (Resposta ou Definição)</label>
+                    <textarea id="card-back-input" rows="4" required placeholder="Digite a resposta ou explicação..." class="w-full px-3.5 py-2.5 text-sm rounded-xl border border-slate-200 dark:border-slate-700 bg-slate-50 dark:bg-slate-800 text-slate-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-brand-500"></textarea>
+                </div>
+                <div class="flex justify-end gap-2 pt-2">
+                    <button type="button" onclick="app.closeModal('card-modal')" class="px-4 py-2 rounded-xl text-sm font-medium text-slate-600 dark:text-slate-300 hover:bg-slate-100 dark:hover:bg-slate-800">Cancelar</button>
+                    <button type="submit" class="px-5 py-2 rounded-xl text-sm font-medium bg-brand-600 hover:bg-brand-700 text-white">Salvar Card</button>
+                </div>
+            </form>
+        </div>
+    </div>
+
+    <!-- Modal: Importação em Lote -->
+    <div id="batch-modal" class="fixed inset-0 z-50 hidden items-center justify-center p-4 bg-slate-900/60 backdrop-blur-xs">
+        <div class="bg-white dark:bg-slate-900 rounded-2xl border border-slate-200 dark:border-slate-800 w-full max-w-xl p-6 shadow-xl space-y-5">
+            <div class="flex items-center justify-between">
+                <h3 class="text-lg font-bold text-slate-900 dark:text-white">Importação Rápida em Lote</h3>
+                <button onclick="app.closeModal('batch-modal')" class="p-1.5 rounded-lg text-slate-400 hover:bg-slate-100 dark:hover:bg-slate-800">
+                    <i data-lucide="x" class="w-5 h-5"></i>
+                </button>
+            </div>
+            <div class="space-y-3">
+                <p class="text-xs text-slate-500 dark:text-slate-400 leading-relaxed">
+                    Cole seus cards abaixo, <strong>um por linha</strong>. Separe a <strong>Frente</strong> e o <strong>Verso</strong> usando ponto e vírgula (<code class="px-1 py-0.5 bg-slate-100 dark:bg-slate-800 rounded">;</code>) ou tabulação (copiado direto do Excel/Planilhas).
+                </p>
+                <textarea id="batch-textarea" rows="7" placeholder="O que é crase?;É a fusão da preposição 'a' com o artigo feminino 'a'.&#10;Capital do Canadá;Ottawa&#10;Fórmula da água;H2O" class="w-full px-3.5 py-2.5 text-sm font-mono rounded-xl border border-slate-200 dark:border-slate-700 bg-slate-50 dark:bg-slate-800 text-slate-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-brand-500"></textarea>
+            </div>
+            <div class="flex justify-end gap-2">
+                <button type="button" onclick="app.closeModal('batch-modal')" class="px-4 py-2 rounded-xl text-sm font-medium text-slate-600 dark:text-slate-300 hover:bg-slate-100 dark:hover:bg-slate-800">Cancelar</button>
+                <button type="button" onclick="app.processBatchImport()" class="px-5 py-2 rounded-xl text-sm font-medium bg-brand-600 hover:bg-brand-700 text-white">Adicionar Cards</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- Modal: Confirmação Customizada (Substitui confirm()) -->
+    <div id="confirm-modal" class="fixed inset-0 z-50 hidden items-center justify-center p-4 bg-slate-900/60 backdrop-blur-xs">
+        <div class="bg-white dark:bg-slate-900 rounded-2xl border border-slate-200 dark:border-slate-800 w-full max-w-sm p-6 shadow-xl space-y-4">
+            <div class="flex items-center gap-3 text-rose-600 dark:text-rose-400">
+                <div class="p-2 rounded-xl bg-rose-50 dark:bg-rose-500/10">
+                    <i data-lucide="alert-triangle" class="w-5 h-5"></i>
+                </div>
+                <h3 id="confirm-title" class="text-base font-bold text-slate-900 dark:text-white">Confirmar exclusão</h3>
+            </div>
+            <p id="confirm-message" class="text-sm text-slate-600 dark:text-slate-400">Tem certeza que deseja realizar esta ação?</p>
+            <div class="flex justify-end gap-2 pt-2">
+                <button onclick="app.closeModal('confirm-modal')" class="px-4 py-2 rounded-xl text-sm font-medium text-slate-600 dark:text-slate-300 hover:bg-slate-100 dark:hover:bg-slate-800">Cancelar</button>
+                <button id="confirm-yes-btn" class="px-4 py-2 rounded-xl text-sm font-medium bg-rose-600 hover:bg-rose-700 text-white">Excluir</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- Toast Notification Container -->
+    <div id="toast-container" class="fixed bottom-4 right-4 z-50 flex flex-col gap-2 pointer-events-none"></div>
+
+    <!-- ==================== LÓGICA DA APLICAÇÃO ==================== -->
+    <script>
+        /**
+         * EstudaCards - Gerenciador completo de flashcards em Vanilla JS
+         * Inclui persistência em localStorage, modo de estudo com fila inteligente,
+         * importação em lote, backup JSON e atalhos de teclado.
+         */
+        const app = {
+            STORAGE_KEY: 'estudacards_data_v1',
+            THEME_KEY: 'estudacards_theme',
+            
+            state: {
+                decks: [],
+                activeDeckId: null,
+                currentView: 'manage', // 'manage' | 'study'
+                editingDeck: false,
+                
+                // Estado da sessão de estudo
+                studyQueue: [],
+                totalInitialCards: 0,
+                completedCount: 0,
+                isFlipped: false,
+                sessionStats: {
+                    again: 0,
+                    hard: 0,
+                    good: 0,
+                    easy: 0
+                }
+            },
+
+            /**
+             * Inicialização da aplicação
+             */
+            init() {
+                this.initTheme();
+                this.loadData();
+                this.bindEvents();
+                this.renderSidebar();
+                this.renderActiveDeck();
+                lucide.createIcons();
+            },
+
+            /**
+             * Configuração de Tema (Claro / Escuro)
+             */
+            initTheme() {
+                const savedTheme = localStorage.getItem(this.THEME_KEY);
+                const prefersDark = window.matchMedia('(prefers-color-scheme: dark)').matches;
+                if (savedTheme === 'dark' || (!savedTheme && prefersDark)) {
+                    document.documentElement.classList.add('dark');
+                } else {
+                    document.documentElement.classList.remove('dark');
+                }
+            },
+
+            toggleTheme() {
+                const isDark = document.documentElement.classList.toggle('dark');
+                localStorage.setItem(this.THEME_KEY, isDark ? 'dark' : 'light');
+            },
+
+            /**
+             * Carregamento e Inicialização dos Dados Padrão
+             */
+            loadData() {
+                try {
+                    const raw = localStorage.getItem(this.STORAGE_KEY);
+                    if (raw) {
+                        const parsed = JSON.parse(raw);
+                        if (Array.isArray(parsed.decks)) {
+                            this.state.decks = parsed.decks;
+                            this.state.activeDeckId = parsed.activeDeckId || (parsed.decks[0]?.id ?? null);
+                            return;
+                        }
+                    }
+                } catch (e) {
+                    console.error('Erro ao ler localStorage:', e);
+                }
+
+                // Baralhos iniciais pré-carregados caso seja o primeiro acesso
+                this.state.decks = [
+                    {
+                        id: 'deck-pt-gramatica',
+                        title: 'Português - Gramática',
+                        category: 'Língua Portuguesa',
+                        cards: [
+                            {
+                                id: 'c-pt-1',
+                                front: 'Quando ocorre a crase antes de nomes de lugares?',
+                                back: 'Usa-se a regra prática: "Vou a, volto da = crase há! Vou a, volto de = crase pra quê?".\nEx: Vou à Bahia (volto da Bahia). Vou a Curitiba (volto de Curitiba).',
+                                status: 'new'
+                            },
+                            {
+                                id: 'c-pt-2',
+                                front: 'Qual a diferença entre "Mas" e "Mais"?',
+                                back: '• MAS: conjunção adversativa, equivale a "porém", "contudo".\n• MAIS: advérbio de intensidade ou pronome indefinido (oposto de "menos").',
+                                status: 'new'
+                            },
+                            {
+                                id: 'c-pt-3',
+                                front: 'O que são palavras proparoxítonas e qual sua regra de acentuação?',
+                                back: 'São palavras cuja antepenúltima sílaba é a tônica.\nRegra: TODAS as proparoxítonas são acentuadas graficamente (ex: lâmpada, médico, lógico).',
+                                status: 'hard'
+                            },
+                            {
+                                id: 'c-pt-4',
+                                front: 'Quando usar "Por que" (separado e sem acento)?',
+                                back: '1. No início ou meio de perguntas diretas ou indiretas ("Por que você faltou?").\n2. Quando puder ser substituído por "pelo qual / pela qual" ("O motivo por que lutei").',
+                                status: 'good'
+                            },
+                            {
+                                id: 'c-pt-5',
+                                front: 'O que é sujeito oculto (desinencial)?',
+                                back: 'É aquele que não está explícito na oração, mas pode ser identificado pela desinência verbal ou pelo contexto.\nEx: "Estudamos muito ontem." (Sujeito: Nós).',
+                                status: 'new'
+                            }
+                        ]
+                    },
+                    {
+                        id: 'deck-conhecimentos-gerais',
+                        title: 'Conhecimentos Gerais',
+                        category: 'Atualidades & Cultura',
+                        cards: [
+                            {
+                                id: 'c-cg-1',
+                                front: 'Qual é o maior bioma exclusivamente brasileiro?',
+                                back: 'A Caatinga, que ocupa cerca de 10% do território nacional, predominante na região Nordeste.',
+                                status: 'new'
+                            },
+                            {
+                                id: 'c-cg-2',
+                                front: 'Em que ano foi promulgada a atual Constituição da República Federativa do Brasil?',
+                                back: 'Em 5 de outubro de 1988, conhecida como a "Constituição Cidadã".',
+                                status: 'easy'
+                            },
+                            {
+                                id: 'c-cg-3',
+                                front: 'Qual planeta do Sistema Solar possui a maior quantidade de luas conhecidas?',
+                                back: 'Saturno (com mais de 140 luas confirmadas, superando Júpiter).',
+                                status: 'hard'
+                            },
+                            {
+                                id: 'c-cg-4',
+                                front: 'Quem pintou a obra "Abaporu" (1928), marco do Modernismo brasileiro?',
+                                back: 'Tarsila do Amaral.',
+                                status: 'new'
+                            }
+                        ]
+                    }
+                ];
+                this.state.activeDeckId = this.state.decks[0].id;
+                this.saveData();
+            },
+
+            saveData() {
+                try {
+                    localStorage.setItem(this.STORAGE_KEY, JSON.stringify({
+                        decks: this.state.decks,
+                        activeDeckId: this.state.activeDeckId
+                    }));
+                } catch (e) {
+                    this.showToast('Erro ao salvar dados no navegador.', 'error');
+                }
+            },
+
+            getActiveDeck() {
+                return this.state.decks.find(d => d.id === this.state.activeDeckId) || null;
+            },
+
+            /**
+             * Eventos Globais e Atalhos de Teclado
+             */
+            bindEvents() {
+                document.getElementById('mobile-menu-btn').addEventListener('click', () => {
+                    document.getElementById('sidebar').classList.remove('-translate-x-full');
+                    document.getElementById('sidebar-overlay').classList.remove('hidden');
+                });
+
+                document.addEventListener('keydown', (e) => {
+                    // Ignorar atalhos se estiver digitando em inputs ou se houver modal aberto
+                    const tag = document.activeElement.tagName.toLowerCase();
+                    const isTyping = tag === 'input' || tag === 'textarea';
+                    const isModalOpen = !document.getElementById('deck-modal').classList.contains('hidden') ||
+                                        !document.getElementById('card-modal').classList.contains('hidden') ||
+                                        !document.getElementById('batch-modal').classList.contains('hidden') ||
+                                        !document.getElementById('confirm-modal').classList.contains('hidden');
+
+                    if (isTyping || isModalOpen) return;
+
+                    if (this.state.currentView === 'study' && this.state.studyQueue.length > 0) {
+                        if (e.code === 'Space') {
+                            e.preventDefault();
+                            this.flipCard();
+                        } else if (this.state.isFlipped) {
+                            if (e.key === '1') this.rateCard('again');
+                            if (e.key === '2') this.rateCard('hard');
+                            if (e.key === '3') this.rateCard('good');
+                            if (e.key === '4') this.rateCard('easy');
+                        }
+                    }
+                });
+            },
+
+            closeMobileSidebar() {
+                document.getElementById('sidebar').classList.add('-translate-x-full');
+                document.getElementById('sidebar-overlay').classList.add('hidden');
+            },
+
+            /**
+             * Renderização da Barra Lateral de Baralhos
+             */
+            renderSidebar() {
+                const listEl = document.getElementById('deck-list');
+                listEl.innerHTML = '';
+
+                this.state.decks.forEach(deck => {
+                    const isActive = deck.id === this.state.activeDeckId;
+                    const reviewCount = deck.cards.filter(c => c.status === 'again' || c.status === 'hard').length;
+                    
+                    const btn = document.createElement('button');
+                    btn.onclick = () => {
+                        this.state.activeDeckId = deck.id;
+                        this.saveData();
+                        this.renderSidebar();
+                        this.renderActiveDeck();
+                        this.closeMobileSidebar();
+                    };
+
+                    btn.className = `w-full text-left px-3.5 py-3 rounded-xl transition-all flex items-center justify-between group ${
+                        isActive 
+                        ? 'bg-brand-600 text-white shadow-sm shadow-brand-500/20' 
+                        : 'hover:bg-slate-100 dark:hover:bg-slate-800/70 text-slate-700 dark:text-slate-300'
+                    }`;
+
+                    btn.innerHTML = `
+                        <div class="min-w-0 pr-2">
+                            <div class="font-semibold text-sm truncate">${this.escapeHTML(deck.title)}</div>
+                            <div class="text-xs truncate ${isActive ? 'text-brand-100' : 'text-slate-400 dark:text-slate-500'}">
+                                ${deck.cards.length} ${deck.cards.length === 1 ? 'card' : 'cards'}
+                                ${reviewCount > 0 ? `• ${reviewCount} p/ revisar` : ''}
+                            </div>
+                        </div>
+                        <i data-lucide="chevron-right" class="w-4 h-4 shrink-0 ${isActive ? 'text-white' : 'text-slate-400 opacity-0 group-hover:opacity-100'} transition-opacity"></i>
+                    `;
+                    listEl.appendChild(btn);
+                });
+
+                lucide.createIcons();
+            },
+
+            /**
+             * Renderização do Baralho Ativo e Alternância de Views
+             */
+            renderActiveDeck() {
+                const deck = this.getActiveDeck();
+                const emptyState = document.getElementById('empty-decks-state');
+                const container = document.getElementById('active-deck-container');
+
+                if (!deck) {
+                    emptyState.classList.remove('hidden');
+                    container.classList.add('hidden');
+                    return;
+                }
+
+                emptyState.classList.add('hidden');
+                container.classList.remove('hidden');
+
+                // Cabeçalho do baralho
+                document.getElementById('active-deck-title').textContent = deck.title;
+                document.getElementById('deck-category-badge').textContent = deck.category || 'Geral';
+                
+                const total = deck.cards.length;
+                const learned = deck.cards.filter(c => c.status === 'good' || c.status === 'easy').length;
+                const toReview = deck.cards.filter(c => c.status === 'again' || c.status === 'hard').length;
+                document.getElementById('deck-stats-summary').textContent = `${total} cards • ${learned} dominados • ${toReview} para revisar`;
+
+                // Estilo dos botões de alternância
+                const btnManage = document.getElementById('btn-mode-manage');
+                const btnStudy = document.getElementById('btn-mode-study');
+
+                if (this.state.currentView === 'manage') {
+                    btnManage.className = 'px-4 py-2.5 rounded-xl text-sm font-semibold bg-slate-900 dark:bg-white text-white dark:text-slate-900 shadow-xs flex items-center gap-2 transition-all';
+                    btnStudy.className = 'px-4 py-2.5 rounded-xl text-sm font-medium bg-brand-50 dark:bg-brand-500/10 text-brand-700 dark:text-brand-300 hover:bg-brand-100 dark:hover:bg-brand-500/20 flex items-center gap-2 transition-all';
+                    
+                    document.getElementById('view-manage').classList.remove('hidden');
+                    document.getElementById('view-study').classList.add('hidden');
+                    this.renderCardsList();
+                } else {
+                    btnStudy.className = 'px-4 py-2.5 rounded-xl text-sm font-semibold bg-brand-600 text-white shadow-xs flex items-center gap-2 transition-all';
+                    btnManage.className = 'px-4 py-2.5 rounded-xl text-sm font-medium border border-slate-200 dark:border-slate-700 text-slate-700 dark:text-slate-300 hover:bg-slate-50 dark:hover:bg-slate-800 flex items-center gap-2 transition-all';
+
+                    document.getElementById('view-manage').classList.add('hidden');
+                    document.getElementById('view-study').classList.remove('hidden');
+                    this.initStudySession();
+                }
+
+                lucide.createIcons();
+            },
+
+            switchView(view) {
+                this.state.currentView = view;
+                this.renderActiveDeck();
+            },
+
+            /**
+             * Renderização da Lista de Cards (Modo Gerenciamento)
+             */
+            renderCardsList() {
+                const deck = this.getActiveDeck();
+                if (!deck) return;
+
+                const query = document.getElementById('search-cards-input').value.toLowerCase().trim();
+                const container = document.getElementById('cards-list-container');
+                container.innerHTML = '';
+
+                const filteredCards = deck.cards.filter(c => 
+                    c.front.toLowerCase().includes(query) || 
+                    c.back.toLowerCase().includes(query)
+                );
+
+                if (filteredCards.length === 0) {
+                    container.innerHTML = `
+                        <div class="bg-white dark:bg-slate-900 rounded-2xl border border-dashed border-slate-300 dark:border-slate-700 p-10 text-center">
+                            <p class="text-sm text-slate-500 dark:text-slate-400">
+                                ${deck.cards.length === 0 ? 'Este baralho ainda não possui flashcards. Clique em "Novo Card" ou "Importar em Lote" para começar.' : 'Nenhum card encontrado para a busca.'}
+                            </p>
+                        </div>
+                    `;
+                    return;
+                }
+
+                const statusLabels = {
+                    new: { text: 'Novo', classes: 'bg-slate-100 text-slate-600 dark:bg-slate-800 dark:text-slate-400' },
+                    again: { text: 'Revisar', classes: 'bg-rose-50 text-rose-700 dark:bg-rose-500/15 dark:text-rose-300' },
+                    hard: { text: 'Difícil', classes: 'bg-amber-50 text-amber-700 dark:bg-amber-500/15 dark:text-amber-300' },
+                    good: { text: 'Bom', classes: 'bg-brand-50 text-brand-700 dark:bg-brand-500/15 dark:text-brand-300' },
+                    easy: { text: 'Fácil', classes: 'bg-emerald-50 text-emerald-700 dark:bg-emerald-500/15 dark:text-emerald-300' }
+                };
+
+                filteredCards.forEach(card => {
+                    const badge = statusLabels[card.status] || statusLabels.new;
+                    const el = document.createElement('div');
+                    el.className = 'bg-white dark:bg-slate-900 rounded-2xl p-4 sm:p-5 border border-slate-200 dark:border-slate-800 hover:border-slate-300 dark:hover:border-slate-700 transition-all flex flex-col sm:flex-row sm:items-start justify-between gap-4';
+                    
+                    el.innerHTML = `
+                        <div class="flex-1 grid grid-cols-1 md:grid-cols-2 gap-4">
+                            <div>
+                                <span class="text-[11px] font-semibold uppercase tracking-wider text-slate-400 block mb-1">Frente</span>
+                                <p class="text-sm font-medium text-slate-900 dark:text-white whitespace-pre-line">${this.escapeHTML(card.front)}</p>
+                            </div>
+                            <div class="md:border-l md:border-slate-100 md:dark:border-slate-800 md:pl-4">
+                                <span class="text-[11px] font-semibold uppercase tracking-wider text-slate-400 block mb-1">Verso</span>
+                                <p class="text-sm text-slate-600 dark:text-slate-300 whitespace-pre-line">${this.escapeHTML(card.back)}</p>
+                            </div>
+                        </div>
+                        <div class="flex sm:flex-col items-center sm:items-end justify-between gap-2 shrink-0 border-t sm:border-t-0 pt-3 sm:pt-0 border-slate-100 dark:border-slate-800">
+                            <span class="text-[11px] font-medium px-2.5 py-0.5 rounded-full ${badge.classes}">${badge.text}</span>
+                            <div class="flex items-center gap-1">
+                                <button onclick="app.openCardModal('${card.id}')" title="Editar Card" class="p-1.5 rounded-lg text-slate-400 hover:text-brand-600 dark:hover:text-brand-400 hover:bg-slate-100 dark:hover:bg-slate-800 transition-colors">
+                                    <i data-lucide="pencil" class="w-4 h-4"></i>
+                                </button>
+                                <button onclick="app.confirmDeleteCard('${card.id}')" title="Excluir Card" class="p-1.5 rounded-lg text-slate-400 hover:text-rose-600 dark:hover:text-rose-400 hover:bg-rose-50 dark:hover:bg-rose-500/10 transition-colors">
+                                    <i data-lucide="trash-2" class="w-4 h-4"></i>
+                                </button>
+                            </div>
+                        </div>
+                    `;
+                    container.appendChild(el);
+                });
+
+                lucide.createIcons();
+            },
+
+            /**
+             * ==================== MODO DE ESTUDO ====================
+             */
+            initStudySession() {
+                const deck = this.getActiveDeck();
+                if (!deck) return;
+
+                const onlyReview = document.getElementById('filter-review-only').checked;
+                let cardsToStudy = [...deck.cards];
+
+                if (onlyReview) {
+                    cardsToStudy = cardsToStudy.filter(c => c.status === 'again' || c.status === 'hard');
+                }
+
+                this.state.studyQueue = cardsToStudy;
+                this.state.totalInitialCards = cardsToStudy.length;
+                this.state.completedCount = 0;
+                this.state.isFlipped = false;
+                this.state.sessionStats = { again: 0, hard: 0, good: 0, easy: 0 };
+
+                this.renderStudyCard();
+            },
+
+            shuffleStudyQueue() {
+                if (this.state.studyQueue.length <= 1) return;
+                for (let i = this.state.studyQueue.length - 1; i > 0; i--) {
+                    const j = Math.floor(Math.random() * (i + 1));
+                    [this.state.studyQueue[i], this.state.studyQueue[j]] = [this.state.studyQueue[j], this.state.studyQueue[i]];
+                }
+                this.state.isFlipped = false;
+                this.renderStudyCard();
+                this.showToast('Cartões embaralhados!');
+            },
+
+            renderStudyCard() {
+                const stage = document.getElementById('study-stage');
+                const progressWrapper = document.getElementById('study-progress-wrapper');
+                const completedScreen = document.getElementById('study-completed-screen');
+                const cardInner = document.getElementById('flashcard-3d');
+
+                // Resetar rotação visual instantaneamente ao trocar de card
+                cardInner.style.transition = 'none';
+                cardInner.classList.remove('rotate-y-180');
+                void cardInner.offsetWidth; // força reflow
+                cardInner.style.transition = '';
+                this.state.isFlipped = false;
+
+                document.getElementById('flip-action-area').classList.remove('hidden');
+                document.getElementById('rating-actions-area').classList.add('hidden');
+
+                // Verifica se fila acabou
+                if (this.state.studyQueue.length === 0) {
+                    stage.classList.add('hidden');
+                    progressWrapper.classList.add('hidden');
+                    completedScreen.classList.remove('hidden');
+
+                    const onlyReview = document.getElementById('filter-review-only').checked;
+                    if (this.state.totalInitialCards === 0) {
+                        document.getElementById('completed-title').textContent = onlyReview ? 'Nenhum card pendente de revisão!' : 'Baralho Vazio';
+                        document.getElementById('completed-subtitle').textContent = onlyReview 
+                            ? 'Você não possui cards marcados como "Difícil" ou "Errei" neste baralho.' 
+                            : 'Adicione alguns flashcards antes de iniciar uma sessão de estudo.';
+                        document.getElementById('session-stats-grid').classList.add('hidden');
+                    } else {
+                        document.getElementById('completed-title').textContent = 'Sessão Concluída!';
+                        document.getElementById('completed-subtitle').textContent = 'Excelente trabalho! Confira o resumo do seu desempenho abaixo:';
+                        document.getElementById('session-stats-grid').classList.remove('hidden');
+                        document.getElementById('stat-again').textContent = this.state.sessionStats.again;
+                        document.getElementById('stat-hard').textContent = this.state.sessionStats.hard;
+                        document.getElementById('stat-good').textContent = this.state.sessionStats.good;
+                        document.getElementById('stat-easy').textContent = this.state.sessionStats.easy;
+                    }
+                    return;
+                }
+
+                // Exibir card atual
+                stage.classList.remove('hidden');
+                progressWrapper.classList.remove('hidden');
+                completedScreen.classList.add('hidden');
+
+                const currentCard = this.state.studyQueue[0];
+                document.getElementById('card-front-text').textContent = currentCard.front;
+                document.getElementById('card-back-text').textContent = currentCard.back;
+
+                // Pill de status
+                const statusMap = {
+                    new: 'Novo',
+                    again: 'Em Revisão',
+                    hard: 'Difícil',
+                    good: 'Bom',
+                    easy: 'Fácil'
+                };
+                document.getElementById('card-status-pill').textContent = statusMap[currentCard.status] || 'Novo';
+
+                // Atualizar barra de progresso
+                const total = Math.max(this.state.totalInitialCards, 1);
+                const pct = Math.min(100, Math.round((this.state.completedCount / total) * 100));
+                document.getElementById('study-progress-bar').style.width = `${pct}%`;
+                document.getElementById('study-progress-text').textContent = `Progresso: ${pct}% concluído`;
+                document.getElementById('study-remaining-text').textContent = `Restantes na fila: ${this.state.studyQueue.length}`;
+            },
+
+            flipCard() {
+                if (this.state.studyQueue.length === 0) return;
+                const cardInner = document.getElementById('flashcard-3d');
+                this.state.isFlipped = !this.state.isFlipped;
+
+                if (this.state.isFlipped) {
+                    cardInner.classList.add('rotate-y-180');
+                    document.getElementById('flip-action-area').classList.add('hidden');
+                    document.getElementById('rating-actions-area').classList.remove('hidden');
+                } else {
+                    cardInner.classList.remove('rotate-y-180');
+                }
+            },
+
+            rateCard(rating) {
+                if (this.state.studyQueue.length === 0) return;
+
+                const deck = this.getActiveDeck();
+                const currentCard = this.state.studyQueue.shift();
+
+                // Atualiza estatística da sessão
+                this.state.sessionStats[rating]++;
+
+                // Atualiza status persistente do card no baralho
+                const cardInDeck = deck.cards.find(c => c.id === currentCard.id);
+                if (cardInDeck) {
+                    cardInDeck.status = rating;
+                }
+
+                // Lógica de fila inteligente:
+                // Se "Errei" (again), reinsere o card 2 posições à frente (ou no final) para repetir na mesma sessão.
+                // Se "Difícil" (hard), reinsere no final da fila caso haja mais cards.
+                if (rating === 'again') {
+                    const insertIndex = Math.min(2, this.state.studyQueue.length);
+                    this.state.studyQueue.splice(insertIndex, 0, currentCard);
+                } else if (rating === 'hard' && this.state.studyQueue.length > 0) {
+                    this.state.studyQueue.push(currentCard);
+                } else {
+                    this.state.completedCount++;
+                }
+
+                this.saveData();
+                this.renderSidebar();
+                this.renderStudyCard();
+            },
+
+            /**
+             * ==================== CRUD BARALHOS ====================
+             */
+            openDeckModal(isEdit = false) {
+                this.state.editingDeck = isEdit;
+                const modal = document.getElementById('deck-modal');
+                const titleEl = document.getElementById('deck-modal-title');
+                const nameInput = document.getElementById('deck-name-input');
+                const catInput = document.getElementById('deck-category-input');
+
+                if (isEdit) {
+                    const deck = this.getActiveDeck();
+                    if (!deck) return;
+                    titleEl.textContent = 'Editar Baralho';
+                    nameInput.value = deck.title;
+                    catInput.value = deck.category || '';
+                } else {
+                    titleEl.textContent = 'Novo Baralho';
+                    nameInput.value = '';
+                    catInput.value = '';
+                }
+
+                modal.classList.remove('hidden');
+                modal.classList.add('flex');
+                setTimeout(() => nameInput.focus(), 50);
+            },
+
+            saveDeck(e) {
+                e.preventDefault();
+                const title = document.getElementById('deck-name-input').value.trim();
+                const category = document.getElementById('deck-category-input').value.trim() || 'Geral';
+                if (!title) return;
+
+                if (this.state.editingDeck) {
+                    const deck = this.getActiveDeck();
+                    if (deck) {
+                        deck.title = title;
+                        deck.category = category;
+                        this.showToast('Baralho atualizado!');
+                    }
+                } else {
+                    const newDeck = {
+                        id: 'deck-' + Date.now(),
+                        title,
+                        category,
+                        cards: []
+                    };
+                    this.state.decks.push(newDeck);
+                    this.state.activeDeckId = newDeck.id;
+                    this.state.currentView = 'manage';
+                    this.showToast('Novo baralho criado!');
+                }
+
+                this.saveData();
+                this.closeModal('deck-modal');
+                this.renderSidebar();
+                this.renderActiveDeck();
+            },
+
+            confirmDeleteDeck() {
+                const deck = this.getActiveDeck();
+                if (!deck) return;
+
+                this.openConfirmModal(
+                    'Excluir Baralho',
+                    `Tem certeza que deseja excluir o baralho "${deck.title}" e todos os seus ${deck.cards.length} cards? Esta ação não pode ser desfeita.`,
+                    () => {
+                        this.state.decks = this.state.decks.filter(d => d.id !== deck.id);
+                        this.state.activeDeckId = this.state.decks[0]?.id || null;
+                        this.saveData();
+                        this.renderSidebar();
+                        this.renderActiveDeck();
+                        this.showToast('Baralho excluído.');
+                    }
+                );
+            },
+
+            /**
+             * ==================== CRUD FLASHCARDS ====================
+             */
+            openCardModal(cardId = null) {
+                const deck = this.getActiveDeck();
+                if (!deck) return;
+
+                const modal = document.getElementById('card-modal');
+                const titleEl = document.getElementById('card-modal-title');
+                const editIdInput = document.getElementById('card-edit-id');
+                const frontInput = document.getElementById('card-front-input');
+                const backInput = document.getElementById('card-back-input');
+
+                if (cardId) {
+                    const card = deck.cards.find(c => c.id === cardId);
+                    if (!card) return;
+                    titleEl.textContent = 'Editar Flashcard';
+                    editIdInput.value = card.id;
+                    frontInput.value = card.front;
+                    backInput.value = card.back;
+                } else {
+                    titleEl.textContent = 'Novo Flashcard';
+                    editIdInput.value = '';
+                    frontInput.value = '';
+                    backInput.value = '';
+                }
+
+                modal.classList.remove('hidden');
+                modal.classList.add('flex');
+                setTimeout(() => frontInput.focus(), 50);
+            },
+
+            saveCard(e) {
+                e.preventDefault();
+                const deck = this.getActiveDeck();
+                if (!deck) return;
+
+                const editId = document.getElementById('card-edit-id').value;
+                const front = document.getElementById('card-front-input').value.trim();
+                const back = document.getElementById('card-back-input').value.trim();
+                if (!front || !back) return;
+
+                if (editId) {
+                    const card = deck.cards.find(c => c.id === editId);
+                    if (card) {
+                        card.front = front;
+                        card.back = back;
+                        this.showToast('Card atualizado!');
+                    }
+                } else {
+                    deck.cards.unshift({
+                        id: 'card-' + Date.now() + '-' + Math.random().toString(36).substr(2, 4),
+                        front,
+                        back,
+                        status: 'new'
+                    });
+                    this.showToast('Card adicionado!');
+                }
+
+                this.saveData();
+                this.closeModal('card-modal');
+                this.renderSidebar();
+                this.renderActiveDeck();
+            },
+
+            confirmDeleteCard(cardId) {
+                const deck = this.getActiveDeck();
+                if (!deck) return;
+
+                this.openConfirmModal(
+                    'Excluir Flashcard',
+                    'Deseja realmente remover este flashcard do baralho?',
+                    () => {
+                        deck.cards = deck.cards.filter(c => c.id !== cardId);
+                        this.saveData();
+                        this.renderSidebar();
+                        this.renderActiveDeck();
+                        this.showToast('Flashcard excluído.');
+                    }
+                );
+            },
+
+            /**
+             * ==================== IMPORTAÇÃO EM LOTE ====================
+             */
+            openBatchModal() {
+                document.getElementById('batch-textarea').value = '';
+                const modal = document.getElementById('batch-modal');
+                modal.classList.remove('hidden');
+                modal.classList.add('flex');
+                setTimeout(() => document.getElementById('batch-textarea').focus(), 50);
+            },
+
+            processBatchImport() {
+                const deck = this.getActiveDeck();
+                if (!deck) return;
+
+                const rawText = document.getElementById('batch-textarea').value;
+                const lines = rawText.split('\n').map(l => l.trim()).filter(l => l.length > 0);
+                
+                let addedCount = 0;
+
+                lines.forEach((line, idx) => {
+                    // Suporta separação por TAB (\t) ou ponto e vírgula (;)
+                    let separator = line.includes('\t') ? '\t' : ';';
+                    const parts = line.split(separator);
+
+                    if (parts.length >= 2) {
+                        const front = parts[0].trim();
+                        const back = parts.slice(1).join(separator).trim();
+                        if (front && back) {
+                            deck.cards.push({
+                                id: 'card-' + Date.now() + '-' + idx,
+                                front,
+                                back,
+                                status: 'new'
+                            });
+                            addedCount++;
+                        }
+                    }
+                });
+
+                if (addedCount > 0) {
+                    this.saveData();
+                    this.closeModal('batch-modal');
+                    this.renderSidebar();
+                    this.renderActiveDeck();
+                    this.showToast(`${addedCount} ${addedCount === 1 ? 'card importado' : 'cards importados'} com sucesso!`);
+                } else {
+                    this.showToast('Nenhum card válido encontrado. Use ";" ou Tab para separar frente e verso.', 'error');
+                }
+            },
+
+            /**
+             * ==================== BACKUP JSON (EXPORTAR / IMPORTAR) ====================
+             */
+            exportJSON() {
+                const dataStr = JSON.stringify({
+                    version: 1,
+                    exportedAt: new Date().toISOString(),
+                    decks: this.state.decks
+                }, null, 2);
+
+                const blob = new Blob([dataStr], { type: 'application/json' });
+                const url = URL.createObjectURL(blob);
+                const a = document.createElement('a');
+                a.href = url;
+                a.download = `estudacards-backup-${new Date().toISOString().slice(0, 10)}.json`;
+                document.body.appendChild(a);
+                a.click();
+                document.body.removeChild(a);
+                URL.revokeObjectURL(url);
+
+                this.showToast('Backup JSON exportado!');
+            },
+
+            importJSON(event) {
+                const file = event.target.files[0];
+                if (!file) return;
+
+                const reader = new FileReader();
+                reader.onload = (e) => {
+                    try {
+                        const parsed = JSON.parse(e.target.result);
+                        if (!parsed.decks || !Array.isArray(parsed.decks)) {
+                            throw new Error('Formato inválido');
+                        }
+
+                        // Mescla ou substitui baralhos importados com IDs únicos
+                        parsed.decks.forEach((importedDeck, i) => {
+                            if (importedDeck.title && Array.isArray(importedDeck.cards)) {
+                                this.state.decks.push({
+                                    id: 'deck-imp-' + Date.now() + '-' + i,
+                                    title: importedDeck.title,
+                                    category: importedDeck.category || 'Importado',
+                                    cards: importedDeck.cards.map((c, j) => ({
+                                        id: 'card-imp-' + Date.now() + '-' + i + '-' + j,
+                                        front: String(c.front || ''),
+                                        back: String(c.back || ''),
+                                        status: ['new', 'again', 'hard', 'good', 'easy'].includes(c.status) ? c.status : 'new'
+                                    }))
+                                });
+                            }
+                        });
+
+                        if (!this.state.activeDeckId && this.state.decks.length > 0) {
+                            this.state.activeDeckId = this.state.decks[0].id;
+                        }
+
+                        this.saveData();
+                        this.renderSidebar();
+                        this.renderActiveDeck();
+                        this.showToast('Backup importado com sucesso!');
+                    } catch (err) {
+                        this.showToast('Arquivo JSON inválido ou corrompido.', 'error');
+                    }
+                    event.target.value = '';
+                };
+                reader.readAsText(file);
+            },
+
+            /**
+             * ==================== UTILITÁRIOS DE UI ====================
+             */
+            closeModal(modalId) {
+                const modal = document.getElementById(modalId);
+                modal.classList.add('hidden');
+                modal.classList.remove('flex');
+            },
+
+            openConfirmModal(title, message, onConfirm) {
+                document.getElementById('confirm-title').textContent = title;
+                document.getElementById('confirm-message').textContent = message;
+                const yesBtn = document.getElementById('confirm-yes-btn');
+                
+                yesBtn.onclick = () => {
+                    onConfirm();
+                    this.closeModal('confirm-modal');
+                };
+
+                const modal = document.getElementById('confirm-modal');
+                modal.classList.remove('hidden');
+                modal.classList.add('flex');
+            },
+
+            showToast(message, type = 'success') {
+                const container = document.getElementById('toast-container');
+                const toast = document.createElement('div');
+                
+                const colors = type === 'error' 
+                    ? 'bg-rose-600 text-white' 
+                    : 'bg-slate-900 dark:bg-white text-white dark:text-slate-900';
+
+                toast.className = `${colors} px-4 py-3 rounded-xl shadow-lg text-xs font-medium flex items-center gap-2 transform transition-all duration-300 translate-y-2 opacity-0`;
+                toast.innerHTML = `<span>${this.escapeHTML(message)}</span>`;
+                
+                container.appendChild(toast);
+                requestAnimationFrame(() => {
+                    toast.classList.remove('translate-y-2', 'opacity-0');
+                });
+
+                setTimeout(() => {
+                    toast.classList.add('opacity-0', 'translate-y-2');
+                    setTimeout(() => toast.remove(), 300);
+                }, 3000);
+            },
+
+            escapeHTML(str) {
+                const div = document.createElement('div');
+                div.textContent = str;
+                return div.innerHTML;
+            }
+        };
+
+        // Inicializa ao carregar a página
+        window.addEventListener('DOMContentLoaded', () => app.init());
+    </script>
+</body>
+</html>
